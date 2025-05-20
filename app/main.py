@@ -1,73 +1,117 @@
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Model paths
 MODEL_DIR = "../model/checkpoints"
 ADAPTER_DIR = "../model/peft_adapter"
 
 def load_model_and_tokenizer():
-    """Load the fine-tuned model and tokenizer."""
+    """Load the model and tokenizer with proper configuration."""
     print("Loading model and tokenizer...")
     
-    # Load base model and tokenizer
-    base_model = AutoModelForCausalLM.from_pretrained("gpt2")
-    tokenizer = AutoTokenizer.from_pretrained("gpt2")
+    # Load tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    
+    # Load base model
+    model = AutoModelForCausalLM.from_pretrained(
+        MODEL_DIR,
+        torch_dtype=torch.float16,
+        device_map="auto"
+    )
     
     # Load LoRA adapter
-    model = PeftModel.from_pretrained(base_model, ADAPTER_DIR)
+    model = PeftModel.from_pretrained(model, ADAPTER_DIR)
     model.eval()
     
     return model, tokenizer
 
-def generate_response(model, tokenizer, prompt, max_length=200):
-    """Generate a response for the given prompt."""
-    inputs = tokenizer(prompt, return_tensors="pt", truncation=True)
-    outputs = model.generate(
-        **inputs,
-        max_length=max_length,
-        num_return_sequences=1,
-        do_sample=True,
-        temperature=0.7,
-        top_p=0.9,
-        top_k=50,
-        repetition_penalty=1.2,
-        no_repeat_ngram_size=3,
-        pad_token_id=tokenizer.eos_token_id
-    )
-    return tokenizer.decode(outputs[0], skip_special_tokens=True)
+def generate_response(model, tokenizer, subject, email_body):
+    """Generate a professional email response."""
+    # Create a more structured prompt
+    prompt = f"""You are an HR manager. Write a professional response to the following leave request:
+
+Subject: {subject}
+
+Body:
+{email_body}
+
+Response (start with "Dear [Name],"):"""
+    
+    # Tokenize input
+    inputs = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True, max_length=512)
+    inputs = {k: v.to(model.device) for k, v in inputs.items()}
+    
+    # Generate response with better parameters
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_length=512,
+            num_return_sequences=1,
+            temperature=0.7,
+            top_p=0.9,
+            top_k=50,
+            do_sample=True,
+            no_repeat_ngram_size=3,
+            pad_token_id=tokenizer.pad_token_id
+        )
+    
+    # Decode and clean up response
+    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    response = response.replace(prompt, "").strip()
+    
+    return response
 
 def main():
-    # Load model and tokenizer
-    model, tokenizer = load_model_and_tokenizer()
-    
-    print("\nSmartEmail Assistant - Professional Email Response Generator")
-    print("Type 'exit' to quit\n")
-    
-    while True:
-        # Get user input
-        subject = input("Enter email subject: ")
-        if subject.lower() == 'exit':
-            break
-            
-        print("\nEnter email body (end with an empty line):")
-        lines = []
+    """Main function to run the email assistant."""
+    try:
+        # Load model and tokenizer
+        model, tokenizer = load_model_and_tokenizer()
+        
+        print("\nSmartEmail Assistant - Professional Email Response Generator")
+        print("Type 'exit' to quit\n")
+        
         while True:
-            line = input()
-            if line.strip() == "":
+            # Get email subject
+            subject = input("Enter email subject: ").strip()
+            if subject.lower() == 'exit':
                 break
-            lines.append(line)
-        email_body = "\n".join(lines)
-        
-        # Generate response
-        prompt = f"Write a professional email response to:\nSubject: {subject}\n\nOriginal Email:\n{email_body}\n\nResponse:"
-        response = generate_response(model, tokenizer, prompt)
-        
-        print("\nGenerated Response:")
-        print("-" * 80)
-        print(response)
-        print("-" * 80)
-        print()
+            
+            # Get email body
+            print("\nEnter email body (end with an empty line):")
+            lines = []
+            while True:
+                line = input()
+                if not line:
+                    break
+                lines.append(line)
+            email_body = "\n".join(lines)
+            
+            if not email_body.strip():
+                print("Email body cannot be empty. Please try again.")
+                continue
+            
+            # Generate and display response
+            print("\nGenerated Response:")
+            print("-" * 80)
+            response = generate_response(model, tokenizer, subject, email_body)
+            print(response)
+            print("-" * 80)
+            print()
+            
+    except KeyboardInterrupt:
+        print("\nExiting...")
+    except Exception as e:
+        print(f"\nAn error occurred: {str(e)}")
+    finally:
+        print("\nThank you for using SmartEmail Assistant!")
 
 if __name__ == "__main__":
     main()
