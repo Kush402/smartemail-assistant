@@ -8,13 +8,18 @@ try:
 except ImportError:
     pass
 
+# Get the project root directory
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 # Model paths
-MODEL_DIR = "../model/checkpoints"
-ADAPTER_DIR = "../model/peft_adapter"
+MODEL_DIR = os.path.join(PROJECT_ROOT, "model", "checkpoints")
+ADAPTER_DIR = os.path.join(PROJECT_ROOT, "model", "peft_adapter")
 
 def load_model_and_tokenizer():
     """Load the model and tokenizer with proper configuration."""
     print("Loading model and tokenizer...")
+    print(f"Model directory: {MODEL_DIR}")
+    print(f"Adapter directory: {ADAPTER_DIR}")
     
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
