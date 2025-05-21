@@ -23,7 +23,7 @@ notebook = {
             "execution_count": None,
             "metadata": {},
             "source": [
-                "!pip install -q torch transformers peft datasets bitsandbytes accelerate wandb"
+                "!pip install -q torch transformers peft datasets bitsandbytes accelerate wandb python-dotenv pandas numpy scikit-learn streamlit"
             ]
         },
         {
@@ -115,6 +115,14 @@ notebook = {
             "execution_count": None,
             "metadata": {},
             "source": [
+                "import sys\n",
+                "import os\n",
+                "\n",
+                "# Add the project root directory to Python path\n",
+                "project_root = \"/content/smartemail-assistant\"\n",
+                "sys.path.append(project_root)\n",
+                "\n",
+                "# Now we can import from app\n",
                 "from app.main import load_model_and_tokenizer, generate_response\n",
                 "\n",
                 "# Load the model\n",
@@ -172,7 +180,8 @@ notebook = {
                 "1. Make sure you're using a GPU runtime\n",
                 "2. Check if all dependencies are installed correctly\n",
                 "3. Verify that your training data is in the correct format\n",
-                "4. Ensure you have enough disk space in Colab"
+                "4. Ensure you have enough disk space in Colab\n",
+                "5. If you get import errors, try restarting the runtime after installing packages"
             ]
         }
     ],
@@ -200,6 +209,6 @@ notebook = {
     "nbformat_minor": 4
 }
 
-# Save the notebook
+# Write the notebook to a file
 with open('colab_setup.ipynb', 'w') as f:
     json.dump(notebook, f, indent=1) 
