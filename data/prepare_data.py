@@ -11,9 +11,6 @@ PROCESSED_PATH = PROCESSED_DIR / "processed_emails.csv"
 
 def preprocess_emails(df):
     """Preprocess the email data."""
-    # Convert date to datetime
-    df['date'] = pd.to_datetime(df['date'])
-    
     # Add email length
     df['body_length'] = df['body'].str.len()
     
