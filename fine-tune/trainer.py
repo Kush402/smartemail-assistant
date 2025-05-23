@@ -24,7 +24,12 @@ with open(config_path, 'r') as f:
 MODEL_NAME = config['model']['name']
 OUTPUT_DIR = os.path.join(os.path.dirname(SCRIPT_DIR), config['training']['output_dir'])
 ADAPTER_DIR = os.path.join(os.path.dirname(SCRIPT_DIR), "model/peft_adapter")
-PROCESSED_DATA_PATH = os.path.join(os.path.dirname(SCRIPT_DIR), "data/processed/processed_emails.csv")
+
+# Handle both local and Colab environments
+if os.path.exists('/content'):  # Running in Colab
+    PROCESSED_DATA_PATH = '/content/smartemail-assistant/data/processed/processed_emails.csv'
+else:  # Running locally
+    PROCESSED_DATA_PATH = os.path.join(os.path.dirname(SCRIPT_DIR), "data/processed/processed_emails.csv")
 
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -58,6 +63,7 @@ def main():
 
     # Load training data
     print("Loading dataset...")
+    print(f"Looking for data at: {PROCESSED_DATA_PATH}")
     train_dataset, _ = load_dataset_for_training(PROCESSED_DATA_PATH, tokenizer_name=MODEL_NAME)
 
     # Define training arguments
