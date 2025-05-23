@@ -8,24 +8,18 @@ PROCESSED_DATA_PATH = "data/processed/processed_emails.csv"
 
 def preprocess_emails(df):
     # Drop rows with missing fields
-    df = df.dropna(subset=["subject", "body", "response"])
+    df = df.dropna(subset=["subject", "body"])
 
     # Remove leading/trailing whitespace
     df["subject"] = df["subject"].str.strip()
     df["body"] = df["body"].str.strip()
-    df["response"] = df["response"].str.strip()
 
-    # Format prompt
-    df["prompt"] = (
-        "You are an HR manager. Write a professional response to the following email:\n\n"
-        "Subject: " + df["subject"] + "\n\n"
-        "Email:\n" + df["body"] + "\n\n"
-        "Response:"
-    )
+    # Calculate body length and word count
+    df["body_length"] = df["body"].str.len()
+    df["word_count"] = df["body"].str.split().str.len()
 
-    # Rename response to completion
-    df = df[["prompt", "response"]]
-    df.rename(columns={"response": "completion"}, inplace=True)
+    # Keep only required columns
+    df = df[["subject", "body", "body_length", "word_count"]]
 
     return df
 

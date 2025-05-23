@@ -9,6 +9,7 @@ from transformers import (
     Trainer,
     TrainingArguments,
     DataCollatorForLanguageModeling,
+    BitsAndBytesConfig,
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from dataset_loader import load_dataset_for_training
@@ -41,13 +42,25 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
+    # Configure 4-bit quantization
+    if config['model']['use_4bit']:
+        quantization_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True,
+        )
+    else:
+        quantization_config = None
+
+    # Load model with appropriate configuration
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_NAME,
-        torch_dtype=torch.float16,
-        device_map="auto",
-        load_in_4bit=config['model']['use_4bit']
+        torch_dtype=torch.float16 if config['training']['fp16'] else torch.float32,
+        device_map="auto",  # Let the model decide device placement
+        quantization_config=quantization_config,
+        trust_remote_code=True
     )
-    model = prepare_model_for_kbit_training(model)
 
     # Apply LoRA
     print("Configuring LoRA...")
@@ -77,14 +90,13 @@ def main():
         warmup_steps=config['training']['warmup_steps'],
         logging_steps=config['training']['logging_steps'],
         save_steps=config['training']['save_steps'],
-        evaluation_strategy=config['training']['evaluation_strategy'],
-        eval_steps=config['training']['eval_steps'],
-        load_best_model_at_end=config['training']['load_best_model_at_end'],
-        metric_for_best_model=config['training']['metric_for_best_model'],
-        greater_is_better=config['training']['greater_is_better'],
         fp16=config['training']['fp16'],
         report_to="none",
         logging_dir=os.path.join(OUTPUT_DIR, "logs"),
+        # Add these for better GPU utilization
+        dataloader_num_workers=4,
+        dataloader_pin_memory=True,
+        gradient_checkpointing=True,
     )
 
     # Data collator
