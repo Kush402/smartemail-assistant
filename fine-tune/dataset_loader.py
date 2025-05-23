@@ -26,8 +26,18 @@ def load_dataset_for_training(csv_path, tokenizer_name, test_size=0.1, max_lengt
     print(f"Loading data from {csv_path}")
     df = pd.read_csv(csv_path)
     
-    if 'processed_text' not in df.columns:
-        raise ValueError("Dataset must contain 'processed_text' column")
+    # Check for required columns
+    required_columns = ['subject', 'body']
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Dataset is missing required columns: {missing_columns}")
+    
+    # Combine subject and body into processed text
+    print("Processing email data...")
+    df['processed_text'] = df.apply(
+        lambda row: f"Subject: {row['subject']}\n\nBody: {row['body']}", 
+        axis=1
+    )
     
     # Split data
     train_df, test_df = train_test_split(df, test_size=test_size, random_state=42)
