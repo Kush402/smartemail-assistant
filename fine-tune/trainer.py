@@ -13,14 +13,18 @@ from transformers import (
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from dataset_loader import load_dataset_for_training
 
+# Get the directory where the script is located
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # Load configuration
-with open('config.yaml', 'r') as f:
+config_path = os.path.join(SCRIPT_DIR, 'config.yaml')
+with open(config_path, 'r') as f:
     config = yaml.safe_load(f)
 
 MODEL_NAME = config['model']['name']
-OUTPUT_DIR = config['training']['output_dir']
-ADAPTER_DIR = "model/peft_adapter"
-PROCESSED_DATA_PATH = "data/processed/processed_emails.csv"
+OUTPUT_DIR = os.path.join(os.path.dirname(SCRIPT_DIR), config['training']['output_dir'])
+ADAPTER_DIR = os.path.join(os.path.dirname(SCRIPT_DIR), "model/peft_adapter")
+PROCESSED_DATA_PATH = os.path.join(os.path.dirname(SCRIPT_DIR), "data/processed/processed_emails.csv")
 
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)

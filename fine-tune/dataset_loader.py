@@ -33,6 +33,7 @@ def load_dataset_for_training(csv_path, tokenizer_name, test_size=0.1, max_lengt
     train_df, test_df = train_test_split(df, test_size=test_size, random_state=42)
     
     # Load tokenizer
+    print(f"Loading tokenizer: {tokenizer_name}")
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
