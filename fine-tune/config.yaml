@@ -1,5 +1,5 @@
 model:
-  name: "meta-llama/Llama-2-7b-hf"
+  name: "mistralai/Mistral-7B-v0.1"
   max_length: 512
   padding: "max_length"
   truncation: true
@@ -14,18 +14,19 @@ training:
   weight_decay: 0.01
   warmup_steps: 100
   logging_steps: 10
-  save_steps: 100
+  save_steps: 50
   evaluation_strategy: "steps"
-  eval_steps: 100
+  eval_steps: 50
   load_best_model_at_end: true
   metric_for_best_model: "loss"
   greater_is_better: false
   fp16: true
+  max_length: 512
 
 lora:
   r: 16
   alpha: 32
+  target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
   dropout: 0.05
   bias: "none"
   task_type: "CAUSAL_LM"
-  target_modules: ["q_proj", "k_proj", "v_proj", "o_proj"]

@@ -2,120 +2,70 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 from datasets import load_dataset
-import numpy as np
+import pandas as pd
 from tqdm import tqdm
 
-def load_model_and_tokenizer(model_path):
+
+def load_model_and_tokenizer(model_path, tokenizer_path=None, base_model="gpt2"):
     """Load the fine-tuned model and tokenizer."""
-    print("Loading model and tokenizer...")
-    base_model = AutoModelForCausalLM.from_pretrained("gpt2")
-    model = PeftModel.from_pretrained(base_model, model_path)
-    tokenizer = AutoTokenizer.from_pretrained("gpt2")
+    print("🔁 Loading model and tokenizer...")
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_path or base_model)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    base = AutoModelForCausalLM.from_pretrained(base_model)
+    model = PeftModel.from_pretrained(base, model_path)
+    model.eval()
     return model, tokenizer
 
-def generate_response(model, tokenizer, prompt, max_length=200):
-    """Generate a response for the given prompt."""
-    inputs = tokenizer(prompt, return_tensors="pt", truncation=True)
-    outputs = model.generate(
-        **inputs,
-        max_length=max_length,
-        num_return_sequences=1,
-        do_sample=True,
-        temperature=0.3,
-        top_p=0.8,
-        top_k=20,
-        repetition_penalty=1.5,
-        no_repeat_ngram_size=3,
-        pad_token_id=tokenizer.eos_token_id,
-        num_beams=5,
-        early_stopping=True
-    )
+
+def generate_response(model, tokenizer, prompt, max_length=256):
+    """Generate a response for a single prompt."""
+    inputs = tokenizer(prompt, return_tensors="pt", truncation=True).to(model.device)
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_length=max_length,
+            do_sample=True,
+            temperature=0.7,
+            top_p=0.9,
+            top_k=50,
+            repetition_penalty=1.2,
+            no_repeat_ngram_size=3,
+            pad_token_id=tokenizer.eos_token_id
+        )
     return tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-def generate_single_response(model, tokenizer, subject, email_body):
-    """Generate a response for a single email."""
-    prompt = f"""You are an HR manager. Write a response to this leave request email. Follow this exact format:
 
-1. Start with "Dear [Name],"
-2. Acknowledge the leave request
-3. Confirm the dates mentioned
-4. State approval or request more information
-5. End with a professional closing
+def evaluate_model(model_path, data_path, tokenizer_path=None, base_model="gpt2"):
+    """Evaluate the model using a CSV with prompts and reference completions."""
+    model, tokenizer = load_model_and_tokenizer(model_path, tokenizer_path, base_model)
 
-Example format:
-Dear [Name],
-
-I have received your leave request for [dates]. [Approval/Request for more info].
-
-[Additional details if needed]
-
-Best regards,
-[Your name]
-
-Now, respond to this email:
-
-Subject: {subject}
-
-Original Email:
-{email_body}
-
-Response:"""
-    response = generate_response(model, tokenizer, prompt)
-    return response
-
-def evaluate_model(model_path, test_data_path):
-    """Evaluate the model on test data."""
-    # Load model and tokenizer
-    model, tokenizer = load_model_and_tokenizer(model_path)
-    model.eval()
+    print(f"📂 Loading test data from: {data_path}")
+    df = pd.read_csv(data_path)
+    if "prompt" not in df.columns:
+        raise ValueError("CSV must contain 'prompt' column.")
     
-    # Load test data
-    print("Loading test data...")
-    test_dataset = load_dataset("csv", data_files=test_data_path)["train"]
-    
-    # Evaluate
-    print("Evaluating model...")
     results = []
-    
-    for example in tqdm(test_dataset):
-        prompt = f"Write a professional email response to:\nSubject: {example['subject']}\n\nOriginal Email:\n{example['body']}\n\nResponse:"
-        generated_response = generate_response(model, tokenizer, prompt)
+    print("🔍 Generating responses...")
+    for i, row in tqdm(df.iterrows(), total=len(df)):
+        prompt = row["prompt"]
+        reference = row.get("completion", "")
+        generated = generate_response(model, tokenizer, prompt)
         results.append({
             "prompt": prompt,
-            "generated": generated_response,
-            "reference": example["body"]
+            "generated": generated,
+            "reference": reference
         })
-    
-    return results
+
+    results_df = pd.DataFrame(results)
+    results_df.to_csv("evaluation_results.csv", index=False)
+    print("✅ Evaluation complete. Results saved to evaluation_results.csv")
+    return results_df
+
 
 if __name__ == "__main__":
-    MODEL_PATH = "model/checkpoints"
-    
-    # Load model and tokenizer
-    model, tokenizer = load_model_and_tokenizer(MODEL_PATH)
-    model.eval()
-    
-    # Interactive input
-    print("\nSmartEmail Assistant - Professional Email Response Generator\n")
-    print("This assistant will help you respond to leave request emails professionally.")
-    print("Please enter the details below:\n")
-    
-    subject = input("Enter the email subject: ")
-    print("\nEnter the original email body (end with an empty line):")
-    lines = []
-    while True:
-        line = input()
-        if line.strip() == "":
-            break
-        lines.append(line)
-    email_body = "\n".join(lines)
-    
-    print("\nGenerating professional response...\n")
-    response = generate_single_response(model, tokenizer, subject, email_body)
-    
-    print("Generated Response:")
-    print("-" * 80)
-    print(response)
-    print("-" * 80)
+    MODEL_PATH = "model/peft_adapter"
+    TEST_DATA_PATH = "data/processed/processed_emails.csv"
+    TOKENIZER_PATH = "model/checkpoints"  # Optional
 
-# Model evaluation metrics 
+    evaluate_model(MODEL_PATH, TEST_DATA_PATH, TOKENIZER_PATH)
